@@ -1,0 +1,6 @@
+@import './normalize.css';
+@import './base.css';
+
+:root {
+  --vt-c-white: #ffffff;
+}
