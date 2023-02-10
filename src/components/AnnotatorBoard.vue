@@ -21,13 +21,13 @@
             <div class="annotator-box" tabindex="1" ref="annotatorBox" @mouseover="enterAnnotatorBox"
                 @mouseleave="leaveAnnotatorBox" @keydown.exact="handleKeyDownEvent" v-loading="loading"
                 element-loading-text="Loading image...">
-                <div class="inner-tool-box" :style="annotator.innerToolBox.boxStyle">
-                    <select :value="currentLabel.name" @change="changeAnnotationLabel($event.target)">
+                <!-- <div class="inner-tool-box" :style="annotator.innerToolBox.boxStyle">
+                    <select :value="currentLabel.name" @change="changeAnnotationLabel()">
                         <option v-for="item in labels" :key="item.name" :label="item.name" :value="item.name" />
                     </select>
                     <el-button type="danger" :icon="Delete"
                         @click="removeAnnotation(annotator.innerToolBox.getCoordinateId())" circle></el-button>
-                </div>
+                </div> -->
                 <v-stage ref="stage" :config="annotator.stageConfig" @mousedown="addTransformerContent">
                     <v-layer :config="annotator.layerConfig" @mouseleave="leaveAddAnnotation" @wheel="wheelResizeLayer"
                         @dragmove="dragMoveLayer">
@@ -186,30 +186,30 @@ async function initAnnotator(container: Element, url: string, annotations: Coord
     loading.value = false;
 }
 
-function saveAnnotationsToFileList(): void {
-    const fileIndex = fileList.findIndex((item) => item.fileName === props.file.name);
-    if (fileIndex === -1) return;
-    fileList[fileIndex].annotations.splice(0);
-    coordinates.forEach((item) => {
-        const annotation = coordinateToAnnotation(item, annotator.imageScale);
-        if (!annotation) return;
-        fileList[fileIndex].annotations.push(annotation);
-    });
-}
+// function saveAnnotationsToFileList(): void {
+//     const fileIndex = fileList.findIndex((item) => item.fileName === props.file.name);
+//     if (fileIndex === -1) return;
+//     fileList[fileIndex].annotations.splice(0);
+//     coordinates.forEach((item) => {
+//         const annotation = coordinateToAnnotation(item, annotator.imageScale);
+//         if (!annotation) return;
+//         fileList[fileIndex].annotations.push(annotation);
+//     });
+// }
 
-async function handleSwitchImage(action: string): Promise<void> {
-    const fileIndex = fileList.findIndex((item) => item.fileName === currentFile.fileName);
-    if (fileIndex === -1) return;
-    if (fileIndex === 0 && action === "pre") return;
-    const max = fileList.length - 1;
-    if (fileIndex === max && action === "next") return;
+// async function handleSwitchImage(action: string): Promise<void> {
+//     const fileIndex = fileList.findIndex((item) => item.fileName === currentFile.fileName);
+//     if (fileIndex === -1) return;
+//     if (fileIndex === 0 && action === "pre") return;
+//     const max = fileList.length - 1;
+//     if (fileIndex === max && action === "next") return;
 
-    saveAnnotationsToFileList();
+//     saveAnnotationsToFileList();
 
-    const changeIndex = action === "pre" ? fileIndex - 1 : fileIndex + 1;
-    const file = fileList[changeIndex];
-    changeprops.fileByName(file.fileName);
-}
+//     const changeIndex = action === "pre" ? fileIndex - 1 : fileIndex + 1;
+//     const file = fileList[changeIndex];
+//     changeprops.fileByName(file.fileName);
+// }
 
 function getLastOneFromAnnotaionItem(): Coordinate | undefined {
     return coordinates.at(-1);
@@ -226,7 +226,7 @@ function addAnnotation() {
     const annotation: Coordinate = new Coordinate();
     annotation.x = x > 0 ? x : 0;
     annotation.y = y > 0 ? y : 0;
-    annotation.className = currentLabel.name;
+    annotation.className = props.currentLabel.name;
 
     if (coordinates.length === 0) {
         annotator.innerToolBox.updateCoordinate(annotation);
@@ -284,7 +284,7 @@ function removeAnnotation(id: string) {
     if (coordinates.length === 0) return
     annotator.innerToolBox.updateCoordinate(coordinates.at(-1)!);
     annotator.innerToolBox.hidden();
-    saveAnnotationsToFileList();
+    // saveAnnotationsToFileList();
 }
 
 function adjustAnnotation(target: Shape, annotation: Coordinate) {
@@ -307,7 +307,7 @@ function adjustAnnotation(target: Shape, annotation: Coordinate) {
 }
 
 function leaveAddAnnotation() {
-    saveAnnotationsToFileList();
+    // saveAnnotationsToFileList();
     if (annotator.annotationMode !== "add") return;
     if (!annotator.isAnnotating) return;
     annotator.isAnnotating = false;
@@ -446,6 +446,7 @@ function resetLayerPosition() {
 }
 
 function enterAnnotatorBox() {
+    if(!annotatorBox.value) return;
     annotatorBox.value.focus();
 }
 
@@ -462,10 +463,10 @@ function handleKeyDownEvent(event: KeyboardEvent) {
 
     switch (event.key.toUpperCase()) {
         case "A":
-            handleSwitchImage("pre");
+            // handleSwitchImage("pre");
             break;
         case "D":
-            handleSwitchImage("next");
+            // handleSwitchImage("next");
             break;
         case "W":
             annotator.changeAnnotateMode("add");
@@ -490,8 +491,8 @@ function handleKeyDownEvent(event: KeyboardEvent) {
         default:
             if (!labelHotKey.includes(event.key)) return;
             hotkeyNum = Number(event.key) != 0 ? Number(event.key) - 1 : 9;
-            if (labels[hotkeyNum] === undefined) return;
-            changeCurrentLabelByName(labels[hotkeyNum].name);
+            if (props.labels[hotkeyNum] === undefined) return;
+            // changeCurrentLabelByName(labels[hotkeyNum].name);
     }
 }
 
@@ -564,7 +565,7 @@ function changeAnnotationLabel(selectedItem: string) {
   display: flex;
   flex-direction: column;
 }
-.list-box {
+/* .list-box {
   @extend %custom-box-shadow;
   width: 100%;
   height: 22%;
@@ -601,4 +602,4 @@ function changeAnnotationLabel(selectedItem: string) {
       }
     }
   }
-}
+} */
