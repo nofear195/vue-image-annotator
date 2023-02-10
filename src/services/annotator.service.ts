@@ -17,19 +17,16 @@ class Coordinate {
   height = 0;
 }
 
-class AnnotationItem {
-  annotations: Coordinate[] = [];
-}
-
 class innerToolBox {
   public boxStyle = "display:none;";
-  private _keepItem = new Coordinate();
+  private coordinate = new Coordinate();
 
-  get keepItem(): Coordinate {
-    return this._keepItem;
+  public getCoordinateId(): string {
+    return this.coordinate.id;
   }
-  set keepItem(item: Coordinate) {
-    this._keepItem = item;
+
+  public updateCoordinate(coordinate: Coordinate): void {
+    this.coordinate = coordinate;
   }
 
   public show(mouseEvent: MouseEvent): void {
@@ -43,24 +40,26 @@ class innerToolBox {
 }
 
 class Annotator {
-  annotationMode = "";
-  isAnnotating = false;
   innerToolBox = new innerToolBox();
 
-  imageInfo: ImageInfo;
-  imageScale: number;
+  annotationMode = "";
+  isAnnotating = false;
+
+  imageScale = 1;
 
   stage: Stage = new Stage({ container: document.createElement("div") });
-  stageConfig: { id: string; width: number; height: number };
+  stageConfig = { id: "stage", width: 1, height: 1 };
 
   layer: Layer = new Layer();
-  transformer: Transformer = new Transformer();
+  layerConfig = { id: "layer", draggable: true };
 
-  imageConfig: { image: HTMLImageElement; scaleX: number; scaleY: number };
-  layerConfig = {
-    id: "layer",
-    draggable: true,
+  imageConfig = {
+    image: new HTMLElement(),
+    scaleX: this.imageScale,
+    scaleY: this.imageScale,
   };
+
+  transformer: Transformer = new Transformer();
   transformerConfig = {
     id: "transformer",
     rotateEnabled: false,
@@ -77,21 +76,19 @@ class Annotator {
     ignoreStroke: true,
   };
 
-  constructor(content?: ImageInfo, container?: Element) {
-    this.imageInfo = content ?? new ImageInfo();
-    const { element, width, height } = this.imageInfo;
+  public async initImageSetting(
+    container: Element,
+    url: string
+  ): Promise<void> {
+    const { element, width, height }: ImageInfo = await getImageData(url);
     const imageMinLength = width < height ? width : height;
-    const containerMaxLength = container
-      ? container.clientWidth < container.clientHeight
+    const containerMaxLength =
+      container.clientWidth < container.clientHeight
         ? container.clientWidth
-        : container.clientHeight
-      : 0;
-    this.imageScale = container ? containerMaxLength / imageMinLength : 1;
-    this.stageConfig = {
-      id: "stage",
-      width: width * this.imageScale,
-      height: height * this.imageScale,
-    };
+        : container.clientHeight;
+    this.imageScale = containerMaxLength / imageMinLength;
+    this.stageConfig.width = width * this.imageScale;
+    this.stageConfig.height = height * this.imageScale;
     this.imageConfig = {
       image: element,
       scaleX: this.imageScale,
@@ -103,6 +100,8 @@ class Annotator {
     this.stage = stageRef.getNode();
     this.layer = this.stage.findOne("Layer");
     this.transformer = this.stage.findOne("#transformer");
+    this.transformer.nodes([]);
+    this.innerToolBox.hidden();
     this.changeAnnotateMode("add");
   }
 
@@ -124,42 +123,6 @@ class Annotator {
   }
 }
 
-function getFixedColorHEXCode(index: number): string {
-  const color: string[] = [
-    "#1B5FA3",
-    "#ee9ca7",
-    "#2193b0",
-    "#f7797d",
-    "#203A43",
-    "#c471ed",
-    "#CC8BA2",
-    "#1565C0",
-    "#AD4E4C",
-    "#64A86F",
-    "#7F7FD5",
-    "#f5af19",
-    "#f12711",
-    "#f4791f",
-    "#4D8E8E",
-    "#DEF2F5",
-    "#DEF2F5",
-    "#4e54c8",
-    "#2c3e50",
-    "#F37335",
-    "#a8ff78",
-    "#FF4B2B",
-    "#60BC37",
-    "#189CEB",
-    "#544a7d",
-    "#ffd452",
-    "#1BAA7D",
-    "#8360c3",
-    "#dd3e54",
-    "#6be585",
-  ];
-  return color[index % color.length];
-}
-
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new window.Image();
@@ -177,12 +140,44 @@ async function getImageData(url: string): Promise<ImageInfo> {
     width: image.width,
   };
 }
+function getFixedColorHEXCode(index: number): string {
+  const color: string[] = [
+    "#1B5FA3",
+    "#ee9ca7",
+    "#2193b0",
+    "#f7797d",
+    "#203A43",
+  ];
+  return color[index % color.length];
+}
+
+class Label {
+  name = "example";
+  color = "#fff";
+}
+
+function getLabelColor(name: string,labels:Label[]): string {
+  const label = labels.find((item) => item.name === name);
+  return label ? label.color : new Label().color;
+}
+
+class FileInfo {
+  name = "";
+  url = "";
+  coordinates: Coordinate[] = [];
+}
+
+class ToolData {
+  labelNames: string[] = [];
+  files: FileInfo[] = [];
+}
 
 export {
-  ImageInfo,
   Coordinate,
-  AnnotationItem,
   Annotator,
   getFixedColorHEXCode,
-  getImageData,
+  Label,
+  getLabelColor,
+  FileInfo,
+  ToolData,
 };

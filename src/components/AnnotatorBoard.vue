@@ -1,7 +1,7 @@
 <template>
     <div class="detectionion-container">
         <div class="frame-box">
-            <div class="image-switch-box">
+            <!-- <div class="image-switch-box">
                 <div class="inner-box" @click="handleSwitchImage('pre')">
                     <el-icon>
                         <ArrowLeft />
@@ -17,31 +17,30 @@
                         <ArrowRight />
                     </el-icon>
                 </div>
-            </div>
+            </div> -->
             <div class="annotator-box" tabindex="1" ref="annotatorBox" @mouseover="enterAnnotatorBox"
                 @mouseleave="leaveAnnotatorBox" @keydown.exact="handleKeyDownEvent" v-loading="loading"
                 element-loading-text="Loading image...">
                 <div class="inner-tool-box" :style="annotator.innerToolBox.boxStyle">
-                    <select :value="currentLabel.name" @change="changeAnnotationLabel($event.target.value)">
+                    <select :value="currentLabel.name" @change="changeAnnotationLabel($event.target)">
                         <option v-for="item in labels" :key="item.name" :label="item.name" :value="item.name" />
                     </select>
                     <el-button type="danger" :icon="Delete"
-                        @click="removeAnnotation(annotator.innerToolBox.keepItem.id)" circle></el-button>
+                        @click="removeAnnotation(annotator.innerToolBox.getCoordinateId())" circle></el-button>
                 </div>
                 <v-stage ref="stage" :config="annotator.stageConfig" @mousedown="addTransformerContent">
                     <v-layer :config="annotator.layerConfig" @mouseleave="leaveAddAnnotation" @wheel="wheelResizeLayer"
                         @dragmove="dragMoveLayer">
                         <v-image :config="annotator.imageConfig" @mousedown="addAnnotation"
                             @mousemove="handleNewAnnotaionSize" />
-                        <v-group v-for="item in annotationItem.annotations" :key="item.id"
-                            :config="{ name: item.id, visible: true }">
+                        <v-group v-for="item in coordinates" :key="item.id" :config="{ name: item.id, visible: true }">
                             <v-rect :config="{
                                 id: item.id,
                                 x: item.x,
                                 y: item.y,
                                 width: item.width,
                                 height: item.height,
-                                stroke: `${getLabelColor(item.className)}`,
+                                stroke: `${getLabelColor(item.className, labels)}`,
                                 draggable: true,
                             }" @mouseup="finsihOnAddAnnotation" @dragmove="dragMoveAnnotation"
                                 @dragend="dragEndAnnotation" @transformend="endTransformOnAnnotation" />
@@ -60,7 +59,7 @@
                 </v-stage>
             </div>
         </div>
-        <div class="list-box">
+        <!-- <div class="list-box">
             <div class="title">
                 <div>No.</div>
                 <div>類別</div>
@@ -70,12 +69,12 @@
                 <div>高</div>
                 <div>操作</div>
             </div>
-            <div class="content" v-if="currentFile">
-                <template v-if="currentFile.annotations.length === 0 && loading">
+            <div class="content" v-if="file">
+                <template v-if="file.coordinates.length === 0 && loading">
                     <div style="margin: auto">empty data</div>
                 </template>
                 <template v-else>
-                    <div class="content-wrapper" v-for="(item, index) in annotationItem.annotations" :key="item.id">
+                    <div class="content-wrapper" v-for="(item, index) in coordinates" :key="item.id">
                         <div>{{ index + 1 }}</div>
                         <div>{{ item.className }}</div>
                         <div>{{ getInt(item.x / annotator.imageScale) }}</div>
@@ -113,7 +112,7 @@
                     </div>
                 </template>
             </div>
-        </div>
+        </div> -->
     </div>
 </template>
 <script setup lang="ts">
@@ -126,49 +125,26 @@ import type { Container } from "konva/lib/Container";
 import type { Shape } from "konva/lib/Shape";
 import type { Group } from "konva/lib/Group";
 import { Delete } from "@element-plus/icons-vue";
+import { Coordinate, Annotator, Label, getLabelColor, FileInfo } from "@/services/annotator.service";
 
 
-import { ImageInfo, Coordinate, AnnotationItem, Annotator, getImageData } from "@/services/annotator.service";
+const props = defineProps<{
+    labels: Label[];
+    currentLabel: Label;
+    file: FileInfo;
+}>();
 
+const emits = defineEmits<{
+    (e: "saveCoordinate"): void;
+    (e: "changeFile"): void;
+}>();
 
-const {
-    labels,
-    currentLabel,
-    fileList,
-    currentFile,
-    getLabelColor,
-    changeCurrentLabelByName,
-    changeCurrentFileByName,
-} = useLabelToolStore();
-
+const loading = ref(false);
+const isMounted = ref(false);
+const annotator = reactive(new Annotator());
+const coordinates: Coordinate[] = reactive([]);
 const annotatorBox: Ref<HTMLDivElement | null> = ref(null);
 const stage = ref(null);
-const loading = ref(false);
-
-const annotator = ref(new Annotator);
-const annotationItem: AnnotationItem = reactive(new AnnotationItem());
-const isMounted = ref(false);
-
-function getInt(val: number): number {
-    if (isNaN(val)) return 0;
-    return Number(val.toFixed(3));
-}
-
-async function initAnnotator(container: Element, url: string, annotations: Coordinate[]): Promise<void> {
-    loading.value = true;
-    const content: ImageInfo = await getImageData(url);
-
-    annotator.value = new Annotator(content, container);
-    annotator.value.initCanvas(stage.value);
-    annotator.value.transformer.nodes([]);
-    annotator.value.innerToolBox.hidden();
-
-    if (annotations.length >= 1) annotator.value.innerToolBox.keepItem = annotations[0];
-
-    loading.value = false;
-}
-
-
 
 onMounted(async () => {
     isMounted.value = true;
@@ -176,7 +152,7 @@ onMounted(async () => {
 });
 
 const currentUrl = computed(() => {
-    return currentFile.url;
+    return props.file.url;
 });
 
 watch(currentUrl, async () => {
@@ -185,26 +161,37 @@ watch(currentUrl, async () => {
 
 async function init(): Promise<void> {
     if (!isMounted.value) return;
-    const url = currentFile.url;
+    const url = props.file.url;
     if (url === "") return;
-    const annotations = currentFile.annotations;
-    await initAnnotator(annotatorBox.value, url, annotations);
-    const imageScale = annotator.value.imageScale;
-    annotationItem.annotations.splice(0);
-    if (annotations.length === 0) return;
-    annotations.forEach((item) => {
-        const coordinate = annotationToCoordinate(item, imageScale);
-        if (!coordinate) return;
-        annotationItem.annotations.push(coordinate);
-    });
+    const fileCoordinates = props.file.coordinates;
+    if (!annotatorBox.value) return;
+    await initAnnotator(annotatorBox.value, url, fileCoordinates);
+    coordinates.splice(0);
+    if (fileCoordinates.length === 0) return;
+    fileCoordinates.forEach((item)=> coordinates.push(item))
+}
+
+function getInt(val: number): number {
+    if (isNaN(val)) return 0;
+    return Number(val.toFixed(3));
+}
+
+async function initAnnotator(container: Element, url: string, annotations: Coordinate[]): Promise<void> {
+    loading.value = true;
+
+    annotator.initImageSetting(container, url)
+    annotator.initCanvas(stage.value);
+    if (annotations.length >= 1) annotator.innerToolBox.updateCoordinate(annotations[0]);
+
+    loading.value = false;
 }
 
 function saveAnnotationsToFileList(): void {
-    const fileIndex = fileList.findIndex((item) => item.fileName === currentFile.fileName);
+    const fileIndex = fileList.findIndex((item) => item.fileName === props.file.name);
     if (fileIndex === -1) return;
     fileList[fileIndex].annotations.splice(0);
-    annotationItem.annotations.forEach((item) => {
-        const annotation = coordinateToAnnotation(item, annotator.value.imageScale);
+    coordinates.forEach((item) => {
+        const annotation = coordinateToAnnotation(item, annotator.imageScale);
         if (!annotation) return;
         fileList[fileIndex].annotations.push(annotation);
     });
@@ -221,38 +208,38 @@ async function handleSwitchImage(action: string): Promise<void> {
 
     const changeIndex = action === "pre" ? fileIndex - 1 : fileIndex + 1;
     const file = fileList[changeIndex];
-    changeCurrentFileByName(file.fileName);
+    changeprops.fileByName(file.fileName);
 }
 
 function getLastOneFromAnnotaionItem(): Coordinate | undefined {
-    return annotationItem.annotations.at(-1);
+    return coordinates.at(-1);
 }
 
 function getAnnotationById(id: string): Coordinate | undefined {
-    return annotationItem.annotations.find((item) => item.id === id);
+    return coordinates.find((item) => item.id === id);
 }
 
 function addAnnotation() {
-    if (annotator.value.annotationMode !== "add") return;
-    const { x, y } = annotator.value.layer.getRelativePointerPosition();
+    if (annotator.annotationMode !== "add") return;
+    const { x, y } = annotator.layer.getRelativePointerPosition();
 
     const annotation: Coordinate = new Coordinate();
     annotation.x = x > 0 ? x : 0;
     annotation.y = y > 0 ? y : 0;
     annotation.className = currentLabel.name;
 
-    if (annotationItem.annotations.length === 0) {
-        annotator.value.innerToolBox.keepItem = annotation;
+    if (coordinates.length === 0) {
+        annotator.innerToolBox.updateCoordinate(annotation);
     }
 
-    annotationItem.annotations.push(annotation);
-    annotator.value.isAnnotating = true;
+    coordinates.push(annotation);
+    annotator.isAnnotating = true;
 }
 
 function handleNewAnnotaionSize() {
-    if (annotator.value.annotationMode !== "add") return;
-    if (!annotator.value.isAnnotating) return;
-    const { x, y } = annotator.value.layer.getRelativePointerPosition();
+    if (annotator.annotationMode !== "add") return;
+    if (!annotator.isAnnotating) return;
+    const { x, y } = annotator.layer.getRelativePointerPosition();
     const annotation = getLastOneFromAnnotaionItem();
     if (!annotation) return;
 
@@ -265,9 +252,9 @@ function handleNewAnnotaionSize() {
 }
 
 function finsihOnAddAnnotation(event: KonvaPointerEvent) {
-    if (annotator.value.annotationMode !== "add") return;
+    if (annotator.annotationMode !== "add") return;
 
-    annotator.value.isAnnotating = false;
+    annotator.isAnnotating = false;
     const annotation = getLastOneFromAnnotaionItem();
     if (!annotation) return;
 
@@ -278,23 +265,25 @@ function finsihOnAddAnnotation(event: KonvaPointerEvent) {
 
     adjustAnnotation(event.target as Shape, annotation);
 
-    if (annotator.value.transformer.nodes().length == 0) annotator.value.innerToolBox.keepItem = annotation;
+    if (annotator.transformer.nodes().length == 0) annotator.innerToolBox.updateCoordinate(annotation);
 
-    annotator.value.innerToolBox.show(event.evt);
+    annotator.innerToolBox.show(event.evt);
 }
 
 function removeAnnotation(id: string) {
-    const rect = annotator.value.stage.findOne(`#${id}`);
+    const rect = annotator.stage.findOne(`#${id}`);
     if (!rect) return;
     const parent = rect.findAncestor("Group") as Container;
     parent.destroy();
-    annotator.value.transformer.nodes([]);
+    annotator.transformer.nodes([]);
 
-    const targetIndex = annotationItem.annotations.findIndex((item) => item.id === id);
+    const targetIndex = coordinates.findIndex((item) => item.id === id);
 
-    annotationItem.annotations.splice(targetIndex, 1);
-    // annotator.value.innerToolBox.keepItem = annotationItem.annotations.at(-1);
-    annotator.value.innerToolBox.hidden();
+    coordinates.splice(targetIndex, 1);
+    if (!coordinates) return
+    if (coordinates.length === 0) return
+    annotator.innerToolBox.updateCoordinate(coordinates.at(-1)!);
+    annotator.innerToolBox.hidden();
     saveAnnotationsToFileList();
 }
 
@@ -319,26 +308,26 @@ function adjustAnnotation(target: Shape, annotation: Coordinate) {
 
 function leaveAddAnnotation() {
     saveAnnotationsToFileList();
-    if (annotator.value.annotationMode !== "add") return;
-    if (!annotator.value.isAnnotating) return;
-    annotator.value.isAnnotating = false;
+    if (annotator.annotationMode !== "add") return;
+    if (!annotator.isAnnotating) return;
+    annotator.isAnnotating = false;
 
     const annotation = getLastOneFromAnnotaionItem();
     if (!annotation) return;
 
-    const mousePos = annotator.value.stage.getPointerPosition() as Vector2d;
-    const stageConfig = annotator.value.stageConfig;
+    const mousePos = annotator.stage.getPointerPosition() as Vector2d;
+    const stageConfig = annotator.stageConfig;
     if (mousePos.x >= stageConfig.width) annotation.width = stageConfig.width - annotation.x;
     if (mousePos.y >= stageConfig.height) annotation.height = stageConfig.height - annotation.y;
 
-    const target = annotator.value.stage.findOne(
+    const target = annotator.stage.findOne(
         (node: Node) => node.attrs.id === annotation.id && node.getClassName() === "Rect"
     ) as Shape;
     adjustAnnotation(target, annotation);
 }
 
 function dragMoveAnnotation(event: KonvaPointerEvent) {
-    annotator.value.innerToolBox.hidden();
+    annotator.innerToolBox.hidden();
 
     const { x, y, id } = event.target.attrs;
     const annotation = getAnnotationById(id);
@@ -349,7 +338,7 @@ function dragMoveAnnotation(event: KonvaPointerEvent) {
 
 function dragEndAnnotation(event: KonvaPointerEvent) {
     const { id, x, y, height, width } = event.target.attrs;
-    const { height: stageHeight, width: stageWidth } = annotator.value.stageConfig;
+    const { height: stageHeight, width: stageWidth } = annotator.stageConfig;
     const annotation = getAnnotationById(id);
     if (!annotation) return;
 
@@ -368,37 +357,37 @@ function dragEndAnnotation(event: KonvaPointerEvent) {
     } else {
         annotation.x = x;
     }
-    annotator.value.innerToolBox.show(event.evt);
+    annotator.innerToolBox.show(event.evt);
 }
 
 function updateTransformerContent(id: string, evt: MouseEvent) {
-    const selectedNode = annotator.value.stage.findOne(`#${id}`);
+    const selectedNode = annotator.stage.findOne(`#${id}`);
 
-    if (id === "" && annotator.value.transformer.nodes().length !== 0) return;
-    annotator.value.transformer.nodes([selectedNode]);
-    annotator.value.innerToolBox.show(evt);
+    if (id === "" && annotator.transformer.nodes().length !== 0) return;
+    annotator.transformer.nodes([selectedNode]);
+    annotator.innerToolBox.show(evt);
 }
 
 function addTransformerContent(event: KonvaPointerEvent) {
     const target = event.target;
 
     if (target.getClassName() !== "Rect") {
-        annotator.value.transformer.nodes([]);
-        annotator.value.innerToolBox.hidden();
+        annotator.transformer.nodes([]);
+        annotator.innerToolBox.hidden();
         return;
     }
 
     const annotation = getAnnotationById(target.attrs.id);
     if (!annotation) return;
 
-    annotator.value.innerToolBox.keepItem = annotation;
+    annotator.innerToolBox.updateCoordinate(annotation);
 
     updateTransformerContent(annotation.id, event.evt);
-    annotator.value.isAnnotating = false;
+    annotator.isAnnotating = false;
 }
 
 function endTransformOnAnnotation(event: KonvaPointerEvent) {
-    annotator.value.isAnnotating = false;
+    annotator.isAnnotating = false;
 
     const target = event.target;
     const { id: eventId, x: eventX, y: eventY, scaleX, scaleY } = target.attrs;
@@ -416,7 +405,7 @@ function endTransformOnAnnotation(event: KonvaPointerEvent) {
 
     // target.position({x:eventX,y:eventY})
     target.setAttrs({ x: eventX, y: eventY, scaleX: 1, scaleY: 1 });
-    annotator.value.innerToolBox.show(event.evt);
+    annotator.innerToolBox.show(event.evt);
 }
 
 function wheelResizeLayer(event: KonvaPointerEvent) {
@@ -428,32 +417,32 @@ function wheelResizeLayer(event: KonvaPointerEvent) {
     const direction = ((event.evt as MouseEvent) as WheelEvent).deltaY;
 
     // layer resize
-    const oldScale = annotator.value.layer.scaleX();
+    const oldScale = annotator.layer.scaleX();
     const scaleBy = 1.5;
     const newScale = direction > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-    annotator.value.layer.scale({ x: newScale, y: newScale });
+    annotator.layer.scale({ x: newScale, y: newScale });
 
     // layer position
-    const pointerPosition = annotator.value.stage.getPointerPosition() as Vector2d;
+    const pointerPosition = annotator.stage.getPointerPosition() as Vector2d;
 
     const mousePointTo = {
-        x: (pointerPosition.x - annotator.value.layer.x()) / oldScale,
-        y: (pointerPosition.y - annotator.value.layer.y()) / oldScale,
+        x: (pointerPosition.x - annotator.layer.x()) / oldScale,
+        y: (pointerPosition.y - annotator.layer.y()) / oldScale,
     };
     const newPos = {
         x: pointerPosition.x - mousePointTo.x * newScale,
         y: pointerPosition.y - mousePointTo.y * newScale,
     };
-    annotator.value.layer.position(newPos);
+    annotator.layer.position(newPos);
 }
 
 function dragMoveLayer() {
-    annotator.value.innerToolBox.hidden();
+    annotator.innerToolBox.hidden();
 }
 
 function resetLayerPosition() {
-    annotator.value.layer.setAttrs({ scaleX: 1, scaleY: 1, x: 0, y: 0 });
-    annotator.value.innerToolBox.hidden();
+    annotator.layer.setAttrs({ scaleX: 1, scaleY: 1, x: 0, y: 0 });
+    annotator.innerToolBox.hidden();
 }
 
 function enterAnnotatorBox() {
@@ -462,7 +451,7 @@ function enterAnnotatorBox() {
 
 function leaveAnnotatorBox() {
     document.body.style.cursor = "auto";
-    annotator.value.innerToolBox.hidden();
+    annotator.innerToolBox.hidden();
 }
 
 function handleKeyDownEvent(event: KeyboardEvent) {
@@ -479,13 +468,13 @@ function handleKeyDownEvent(event: KeyboardEvent) {
             handleSwitchImage("next");
             break;
         case "W":
-            annotator.value.changeAnnotateMode("add");
+            annotator.changeAnnotateMode("add");
             break;
         case "E":
-            annotator.value.changeAnnotateMode("drag");
+            annotator.changeAnnotateMode("drag");
             break;
         case "S":
-            pickAnnotationById(annotator.value.innerToolBox.keepItem.id);
+            pickAnnotationById(annotator.innerToolBox.getCoordinateId());
             break;
         case "Z":
             resetLayerPosition();
@@ -494,9 +483,9 @@ function handleKeyDownEvent(event: KeyboardEvent) {
             toggleAnnotationTextVisible();
             break;
         case "DELETE":
-            if (annotationItem.length === 0) return;
-            if (!annotator.value.innerToolBox.keepItem) return;
-            removeAnnotation(annotator.value.innerToolBox.keepItem.id);
+            if (coordinates.length === 0) return;
+            if (annotator.innerToolBox.getCoordinateId() === '') return;
+            removeAnnotation(annotator.innerToolBox.getCoordinateId());
             break;
         default:
             if (!labelHotKey.includes(event.key)) return;
@@ -510,12 +499,12 @@ function pickAnnotationById(id: string) {
     const annotation = getAnnotationById(id);
     if (!annotation) return;
 
-    const targetNode = annotator.value.stage.findOne(`#${annotation.id}`);
-    annotator.value.transformer.nodes([targetNode]);
+    const targetNode = annotator.stage.findOne(`#${annotation.id}`);
+    annotator.transformer.nodes([targetNode]);
 }
 
 function toggleAnnotationTextVisible() {
-    const textLabels = annotator.value.layer.find("Text");
+    const textLabels = annotator.layer.find("Text");
     if (textLabels.length === 0) return;
 
     textLabels.forEach((item) => {
@@ -525,35 +514,36 @@ function toggleAnnotationTextVisible() {
 }
 
 async function handleAnnotationVisibleById(id: string, action: boolean) {
-    const groups = annotator.value.layer.find((node: Group) => node.getType() === "Group" && node.attrs.name === id);
+    const groups = annotator.layer.find((node: Group) => node.getType() === "Group" && node.attrs.name === id);
     if (groups.length === 0) return;
     action ? groups[0].setAttrs({ visible: true }) : groups[0].setAttrs({ visible: false });
-    if (groups[0].attrs.visible === false) annotator.value.transformer.nodes([]);
+    if (groups[0].attrs.visible === false) annotator.transformer.nodes([]);
 }
 
 function checkAnnotationVisibleById(id: string): boolean {
-    const groups = annotator.value.layer.find((node: Group) => node.getType() === "Group" && node.attrs.name === id);
+    const groups = annotator.layer.find((node: Group) => node.getType() === "Group" && node.attrs.name === id);
     if (groups.length === 0) return true;
     return groups[0].attrs.visible;
 }
 
 function setAnnotationDraggableById(id: string, action: boolean) {
-    const rects = annotator.value.layer.find((node: Node) => node.getClassName() === "Rect" && node.attrs.id === id);
+    const rects = annotator.layer.find((node: Node) => node.getClassName() === "Rect" && node.attrs.id === id);
     if (rects.length === 0) return;
     action ? rects[0].setAttrs({ draggable: true }) : rects[0].setAttrs({ draggable: false });
 }
 
 function checkAnnotationDraggableById(id: string): boolean {
-    const rects = annotator.value.layer.find((node: Node) => node.getClassName() === "Rect" && node.attrs.id === id);
+    const rects = annotator.layer.find((node: Node) => node.getClassName() === "Rect" && node.attrs.id === id);
     if (rects.length === 0) return true;
     return rects[0].attrs.draggable;
 }
 
 function changeAnnotationLabel(selectedItem: string) {
-    const annotation = getAnnotationById(annotator.value.innerToolBox.keepItem.id);
+    if(!selectedItem) return
+    const annotation = getAnnotationById(annotator.innerToolBox.getCoordinateId());
     if (!annotation) return;
 
-    const labelName = labels.find((item) => item.name === selectedItem);
+    const labelName = props.labels.find((item) => item.name === selectedItem);
     if (!labelName) return;
 
     annotation.className = labelName.name;
