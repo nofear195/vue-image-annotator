@@ -7,7 +7,8 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"MisterJ.vue-volar-extention-pack"
+				"MisterJ.vue-volar-extention-pack",
+				"bradlc.vscode-tailwindcss"
 			]
 		}
 	}

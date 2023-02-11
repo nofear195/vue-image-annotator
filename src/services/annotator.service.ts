@@ -8,9 +8,9 @@ class ImageInfo {
   height = 0;
 }
 
-class Coordinate {
+class Markbox {
   id = Date.now().toString();
-  className = "";
+  labelName = "";
   x = 0;
   y = 0;
   width = 0;
@@ -19,14 +19,14 @@ class Coordinate {
 
 class innerToolBox {
   public boxStyle = "display:none;";
-  private coordinate = new Coordinate();
+  private markbox = new Markbox();
 
-  public getCoordinateId(): string {
-    return this.coordinate.id;
+  public getMarkboxId(): string {
+    return this.markbox.id;
   }
 
-  public updateCoordinate(coordinate: Coordinate): void {
-    this.coordinate = coordinate;
+  public updateMarkbox(markbox: Markbox): void {
+    this.markbox = markbox
   }
 
   public show(mouseEvent: MouseEvent): void {
@@ -40,11 +40,12 @@ class innerToolBox {
 }
 
 class Annotator {
-  innerToolBox = new innerToolBox();
-
-  annotationMode = "";
+  // state
+  mode = "";
   isAnnotating = false;
 
+  innerToolBox = new innerToolBox();
+  // Konva settings
   imageScale = 1;
 
   stage: Stage = new Stage({ container: document.createElement("div") });
@@ -54,7 +55,7 @@ class Annotator {
   layerConfig = { id: "layer", draggable: true };
 
   imageConfig = {
-    image: new HTMLElement(),
+    image: new Image(),
     scaleX: this.imageScale,
     scaleY: this.imageScale,
   };
@@ -110,12 +111,12 @@ class Annotator {
       case "drag":
         this.layer.setAttrs({ draggable: true });
         document.body.style.cursor = "grab";
-        this.annotationMode = "drag";
+        this.mode = "drag";
         break;
       case "add":
         this.layer.setAttrs({ draggable: false });
         document.body.style.cursor = "crosshair";
-        this.annotationMode = "add";
+        this.mode = "add";
         break;
       default:
         console.log("out of case");
@@ -156,7 +157,7 @@ class Label {
   color = "#fff";
 }
 
-function getLabelColor(name: string,labels:Label[]): string {
+function getLabelColor(name: string, labels: Label[]): string {
   const label = labels.find((item) => item.name === name);
   return label ? label.color : new Label().color;
 }
@@ -164,7 +165,7 @@ function getLabelColor(name: string,labels:Label[]): string {
 class FileInfo {
   name = "";
   url = "";
-  coordinates: Coordinate[] = [];
+  markboxes: Markbox[] = [];
 }
 
 class ToolData {
@@ -173,7 +174,7 @@ class ToolData {
 }
 
 export {
-  Coordinate,
+  Markbox,
   Annotator,
   getFixedColorHEXCode,
   Label,
