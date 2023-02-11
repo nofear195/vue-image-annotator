@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center w-screen h-screen">
-    <div class="w-[50vw] h-[50vh]">
+    <div class="w-[90vw] h-[60vh] m-auto">
       <AnnotatorBoard
         :labels="labels"
         :current-label="currentLabel"
@@ -22,7 +22,7 @@ import {
 //   msg: string;
 // }>();
 const labels: Label[] = reactive([]);
-const currentLabel = computed<Label>(() => labels[0]);
+const currentLabel: Label = reactive(new Label());
 const file: FileInfo = reactive(new FileInfo());
 const toolData: ToolData = reactive(new ToolData());
 onMounted(() => {
@@ -34,6 +34,8 @@ onMounted(() => {
       color: getFixedColorHEXCode(i),
     });
   }
+  currentLabel.name = labels[0].name;
+  currentLabel.color = labels[0].color;
   file.name = "file01";
   file.markboxes = [];
   file.url =

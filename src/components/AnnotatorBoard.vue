@@ -1,7 +1,7 @@
 <template>
-  <div class="w-full h-full flex flex-col justify-between">
+  <div class="w-full h-full flex flex-row justify-between">
     <div
-      class="w-full h-full m-auto relative focus:outline-none"
+      class="flex-auto relative focus:outline-none"
       tabindex="1"
       ref="annotatorBox"
       @mouseover="enterAnnotatorBox"
@@ -10,28 +10,37 @@
       v-loading="loading"
       element-loading-text="Loading image..."
     >
-      <!-- <div class="inner-tool-box" :style="annotator.innerToolBox.boxStyle">
-                    <select :value="currentLabel.name" @change="changeAnnotationLabel()">
-                        <option v-for="item in labels" :key="item.name" :label="item.name" :value="item.name" />
-                    </select>
-                    <el-button type="danger" :icon="Delete"
-                        @click="removeMarkbox(annotator.innerToolBox.getCoordinateId())" circle></el-button>
-                </div> -->
+      <div class="flex absolute z-10" :style="annotator.innerToolBox.boxStyle">
+        <select :value="currentLabel.name" @change="changeAnnotationLabel">
+          <option
+            v-for="item in labels"
+            :key="item.name"
+            :label="item.name"
+            :value="item.name"
+          />
+        </select>
+        <el-button
+          type="danger"
+          :icon="Delete"
+          @click="removeMarkbox(annotator.innerToolBox.getMarkboxId())"
+          circle
+        ></el-button>
+      </div>
       <v-stage
         ref="stage"
         :config="annotator.stageConfig"
-        @mousedown="addTransformerContent"
+        @mousedown="startResizeMarkbox"
       >
         <v-layer
           :config="annotator.layerConfig"
           @mouseleave="leaveAnnotateRange"
           @wheel="wheelResizeLayer"
-          @dragmove="dragMoveLayer"
+          @dragmove="dragLayer"
         >
           <v-image
             :config="annotator.imageConfig"
             @mousedown="createMarkbox"
-            @mousemove="resizeNewMarkbox"
+            @mousemove="editMarkboxVolume"
           />
           <v-group
             v-for="item in markboxes"
@@ -48,10 +57,10 @@
                 stroke: `${getLabelColor(item.labelName, labels)}`,
                 draggable: true,
               }"
-              @mouseup="stopResizeNewMarkbox"
-              @dragmove="dragMoveAnnotation"
-              @dragend="dragEndAnnotation"
-              @transformend="endTransformOnAnnotation"
+              @mouseup="stopEditMarkboxVolume"
+              @dragmove="startDragMarkbox"
+              @dragend="stopDragMarkbox"
+              @transformend="stopResizeMarkbox"
             />
             <v-text
               :config="{
@@ -69,60 +78,84 @@
         </v-layer>
       </v-stage>
     </div>
-    <!-- <div class="list-box">
-            <div class="title">
-                <div>No.</div>
-                <div>類別</div>
-                <div>X 座標</div>
-                <div>Y 座標</div>
-                <div>寬</div>
-                <div>高</div>
-                <div>操作</div>
-            </div>
-            <div class="content" v-if="file">
-                <template v-if="file.coordinates.length === 0 && loading">
-                    <div style="margin: auto">empty data</div>
+    <div class="flex-auto w-1/3 h-full">
+      <el-table :data="markboxes" max-height="100%" stripe height="100%">
+        <el-table-column type="expand">
+          <template #default="scope">
+            <div class="flex h-8 justify-evenly">
+              <el-icon
+                size="1.5rem"
+                class="cursor-pointer"
+                @click="toggleMarkboxVisible(scope.row.id)"
+              >
+                <template v-if="markboxVisible(scope.row.id)">
+                  <View />
                 </template>
                 <template v-else>
-                    <div class="content-wrapper" v-for="(item, index) in coordinates" :key="item.id">
-                        <div>{{ index + 1 }}</div>
-                        <div>{{ item.labelName }}</div>
-                        <div>{{ getInt(item.x / annotator.imageScale) }}</div>
-                        <div>{{ getInt(item.y / annotator.imageScale) }}</div>
-                        <div>{{ getInt(item.width / annotator.imageScale) }}</div>
-                        <div>{{ getInt(item.height / annotator.imageScale) }}</div>
-                        <div class="operate-box">
-                            <template v-if="checkAnnotationVisibleById(item.id)">
-                                <el-icon @click="handleAnnotationVisibleById(item.id, false)">
-                                    <View />
-                                </el-icon>
-                            </template>
-                            <template v-else>
-                                <el-icon @click="handleAnnotationVisibleById(item.id, true)">
-                                    <Hide />
-                                </el-icon>
-                            </template>
-                            <template v-if="checkAnnotationDraggableById(item.id)">
-                                <el-icon @click="setAnnotationDraggableById(item.id, false)">
-                                    <Unlock />
-                                </el-icon>
-                            </template>
-                            <template v-else>
-                                <el-icon @click="setAnnotationDraggableById(item.id, true)">
-                                    <Lock />
-                                </el-icon>
-                            </template>
-                            <el-icon @click="pickAnnotationById(item.id)">
-                                <Edit />
-                            </el-icon>
-                            <el-icon @click="removeMarkbox(item.id)">
-                                <Delete />
-                            </el-icon>
-                        </div>
-                    </div>
+                  <Hide />
                 </template>
+              </el-icon>
+              <el-icon
+                size="1.5rem"
+                class="cursor-pointer"
+                @click="toggleMarkboxDraggable(scope.row.id)"
+              >
+                <template v-if="markboxDraggable(scope.row.id)">
+                  <Unlock />
+                </template>
+                <template v-else>
+                  <Lock />
+                </template>
+              </el-icon>
+              <el-icon
+                size="1.5rem"
+                class="cursor-pointer"
+                @click="pickMarkboxById(scope.row.id)"
+              >
+                <Edit />
+              </el-icon>
+              <el-icon
+                size="1.5rem"
+                class="cursor-pointer"
+                @click="removeMarkbox(scope.row.id)"
+              >
+                <Delete />
+              </el-icon>
             </div>
-        </div> -->
+          </template>
+        </el-table-column>
+        <el-table-column type="index" label="No." />
+        <el-table-column prop="labelName" label="class" />
+        <el-table-column label="X">
+          <template #default="scope">
+            <div class="flex items-center">
+              {{ scope.row.x.toFixed(2) }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="Y">
+          <template #default="scope">
+            <div class="flex items-center">
+              {{ scope.row.y.toFixed(2) }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="Width">
+          <template #default="scope">
+            <div class="flex items-center">
+              {{ scope.row.width.toFixed(2) }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="Height">
+          <template #default="scope">
+            <div class="flex items-center">
+              {{ scope.row.height.toFixed(2) }}
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
   </div>
 </template>
 <script setup lang="ts">
@@ -132,7 +165,6 @@ import type { KonvaPointerEvent } from "konva/lib/PointerEvents";
 import type { Vector2d } from "konva/lib/types";
 import type { Node } from "konva/lib/Node";
 import type { Container } from "konva/lib/Container";
-import type { Shape } from "konva/lib/Shape";
 import type { Group } from "konva/lib/Group";
 import { Delete } from "@element-plus/icons-vue";
 import {
@@ -195,17 +227,12 @@ async function initAnnotator(
 
   annotator.initImageSetting(container, url);
   annotator.initCanvas(stage.value);
-  if (markboxes.length >= 1)
-    annotator.innerToolBox.updateMarkbox(markboxes[0]);
+  if (markboxes.length >= 1) annotator.innerToolBox.updateMarkbox(markboxes[0]);
 
   loading.value = false;
 }
 
 /////////
-function getInt(val: number): number {
-  if (isNaN(val)) return 0;
-  return Number(val.toFixed(3));
-}
 
 function getLastestMarkbox(): Markbox | undefined {
   return markboxes.at(-1);
@@ -215,25 +242,25 @@ function getMarkboxById(id: string): Markbox | undefined {
   return markboxes.find((item) => item.id === id);
 }
 
-function adjustMarkbox(shape: Shape, markbox: Markbox) {
+function adjustMarkbox(node: Node, markbox: Markbox) {
   const {
-    x: shapeX,
-    y: shapeY,
+    x: nodeX,
+    y: nodeY,
     width: shapeWidth,
     height: shapeHeight,
-  } = shape.attrs;
+  } = node.attrs;
   if (shapeWidth < 0) {
-    const newX = shapeX + shapeWidth;
+    const newX = nodeX + shapeWidth;
     const newWidth = Math.abs(shapeWidth);
-    shape.setAttrs({ x: newX, width: newWidth });
+    node.setAttrs({ x: newX, width: newWidth });
     markbox.x = newX;
     markbox.width = newWidth;
   }
 
   if (shapeHeight < 0) {
-    const newY = shapeY + shapeHeight;
+    const newY = nodeY + shapeHeight;
     const newHeight = Math.abs(shapeHeight);
-    shape.setAttrs({ y: newY, height: newHeight });
+    node.setAttrs({ y: newY, height: newHeight });
     markbox.y = newY;
     markbox.height = newHeight;
   }
@@ -246,15 +273,15 @@ function removeMarkbox(id: string) {
   parent.destroy();
   annotator.transformer.nodes([]);
 
+  annotator.innerToolBox.hidden();
   const targetIndex = markboxes.findIndex((item) => item.id === id);
   if (targetIndex === -1) return;
   markboxes.splice(targetIndex, 1);
   if (markboxes.length === 0) return;
   annotator.innerToolBox.updateMarkbox(markboxes.at(-1)!);
-  annotator.innerToolBox.hidden();
 }
 
-/////////
+///////// creat markbox
 
 function createMarkbox(): void {
   if (annotator.mode !== "add") return;
@@ -269,7 +296,7 @@ function createMarkbox(): void {
   annotator.isAnnotating = true;
 }
 
-function resizeNewMarkbox(): void {
+function editMarkboxVolume(): void {
   if (annotator.mode !== "add") return;
   if (!annotator.isAnnotating) return;
   const { x: newX, y: newY } = annotator.layer.getRelativePointerPosition();
@@ -280,7 +307,7 @@ function resizeNewMarkbox(): void {
   markbox.height = newY - oldY;
 }
 
-function stopResizeNewMarkbox(event: KonvaPointerEvent) {
+function stopEditMarkboxVolume(event: KonvaPointerEvent): void {
   if (annotator.mode !== "add") return;
 
   annotator.isAnnotating = false;
@@ -292,7 +319,7 @@ function stopResizeNewMarkbox(event: KonvaPointerEvent) {
     return;
   }
 
-  adjustMarkbox(event.target as Shape, markbox);
+  adjustMarkbox(event.target, markbox);
 
   if (annotator.transformer.nodes().length == 0)
     annotator.innerToolBox.updateMarkbox(markbox);
@@ -300,7 +327,7 @@ function stopResizeNewMarkbox(event: KonvaPointerEvent) {
   annotator.innerToolBox.show(event.evt);
 }
 
-function leaveAnnotateRange() {
+function leaveAnnotateRange(): void {
   if (annotator.mode !== "add") return;
   if (!annotator.isAnnotating) return;
   annotator.isAnnotating = false;
@@ -315,14 +342,15 @@ function leaveAnnotateRange() {
   if (mousePos.y >= stageConfig.height)
     markbox.height = stageConfig.height - markbox.y;
 
-  const target = annotator.stage.findOne(
+  const markboxNode = annotator.stage.findOne(
     (node: Node) =>
       node.attrs.id === markbox.id && node.getClassName() === "Rect"
-  ) as Shape;
-  adjustMarkbox(target, markbox);
+  );
+  adjustMarkbox(markboxNode, markbox);
 }
 
-function dragMoveAnnotation(event: KonvaPointerEvent) {
+////// drag markbox
+function startDragMarkbox(event: KonvaPointerEvent): void {
   annotator.innerToolBox.hidden();
 
   const { x, y, id } = event.target.attrs;
@@ -332,7 +360,7 @@ function dragMoveAnnotation(event: KonvaPointerEvent) {
   markbox.y = y;
 }
 
-function dragEndAnnotation(event: KonvaPointerEvent) {
+function stopDragMarkbox(event: KonvaPointerEvent): void {
   const { id, x, y, height, width } = event.target.attrs;
   const { height: stageHeight, width: stageWidth } = annotator.stageConfig;
   const markbox = getMarkboxById(id);
@@ -356,15 +384,14 @@ function dragEndAnnotation(event: KonvaPointerEvent) {
   annotator.innerToolBox.show(event.evt);
 }
 
-function updateTransformerContent(id: string, evt: MouseEvent) {
-  const selectedNode = annotator.stage.findOne(`#${id}`);
-
-  if (id === "" && annotator.transformer.nodes().length !== 0) return;
-  annotator.transformer.nodes([selectedNode]);
+function updateTransformerContent(id: string, evt: MouseEvent): void {
+  const node = annotator.stage.findOne(`#${id}`);
+  if (!node) return;
+  annotator.transformer.nodes([node]);
   annotator.innerToolBox.show(evt);
 }
 
-function addTransformerContent(event: KonvaPointerEvent) {
+function startResizeMarkbox(event: KonvaPointerEvent): void {
   const target = event.target;
 
   if (target.getClassName() !== "Rect") {
@@ -379,12 +406,9 @@ function addTransformerContent(event: KonvaPointerEvent) {
   annotator.innerToolBox.updateMarkbox(markbox);
 
   updateTransformerContent(markbox.id, event.evt);
-  annotator.isAnnotating = false;
 }
 
-function endTransformOnAnnotation(event: KonvaPointerEvent) {
-  annotator.isAnnotating = false;
-
+function stopResizeMarkbox(event: KonvaPointerEvent) {
   const target = event.target;
   const { id: eventId, x: eventX, y: eventY, scaleX, scaleY } = target.attrs;
 
@@ -399,11 +423,11 @@ function endTransformOnAnnotation(event: KonvaPointerEvent) {
   markbox.x = eventX;
   markbox.y = eventY;
 
-  // target.position({x:eventX,y:eventY})
   target.setAttrs({ x: eventX, y: eventY, scaleX: 1, scaleY: 1 });
   annotator.innerToolBox.show(event.evt);
 }
 
+// resize layer
 function wheelResizeLayer(event: KonvaPointerEvent) {
   // mouse wheel event
   event.evt.preventDefault();
@@ -432,7 +456,7 @@ function wheelResizeLayer(event: KonvaPointerEvent) {
   annotator.layer.position(newPos);
 }
 
-function dragMoveLayer() {
+function dragLayer() {
   annotator.innerToolBox.hidden();
 }
 
@@ -440,6 +464,8 @@ function resetLayerPosition() {
   annotator.layer.setAttrs({ scaleX: 1, scaleY: 1, x: 0, y: 0 });
   annotator.innerToolBox.hidden();
 }
+
+// annotator box
 
 function enterAnnotatorBox() {
   if (!annotatorBox.value) return;
@@ -452,8 +478,6 @@ function leaveAnnotatorBox() {
 }
 
 function handleKeyDownEvent(event: KeyboardEvent) {
-  let getLastItem: Markbox[] = [];
-  let labelCollation = [];
   const labelHotKey = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
   let hotkeyNum = 0;
 
@@ -471,7 +495,7 @@ function handleKeyDownEvent(event: KeyboardEvent) {
       annotator.changeAnnotateMode("drag");
       break;
     case "S":
-      pickAnnotationById(annotator.innerToolBox.getMarkboxId());
+      pickMarkboxById(annotator.innerToolBox.getMarkboxId());
       break;
     case "Z":
       resetLayerPosition();
@@ -488,16 +512,15 @@ function handleKeyDownEvent(event: KeyboardEvent) {
       if (!labelHotKey.includes(event.key)) return;
       hotkeyNum = Number(event.key) != 0 ? Number(event.key) - 1 : 9;
       if (props.labels[hotkeyNum] === undefined) return;
-    // changeCurrentLabelByName(labels[hotkeyNum].name);
   }
 }
 
-function pickAnnotationById(id: string) {
+function pickMarkboxById(id: string) {
   const markbox = getMarkboxById(id);
   if (!markbox) return;
 
-  const targetNode = annotator.stage.findOne(`#${markbox.id}`);
-  annotator.transformer.nodes([targetNode]);
+  const node = annotator.stage.findOne(`#${markbox.id}`);
+  annotator.transformer.nodes([node]);
 }
 
 function toggleAnnotationTextVisible() {
@@ -510,18 +533,20 @@ function toggleAnnotationTextVisible() {
   });
 }
 
-async function handleAnnotationVisibleById(id: string, action: boolean) {
+async function toggleMarkboxVisible(id: string) {
   const groups = annotator.layer.find(
     (node: Group) => node.getType() === "Group" && node.attrs.name === id
   );
   if (groups.length === 0) return;
-  action
-    ? groups[0].setAttrs({ visible: true })
-    : groups[0].setAttrs({ visible: false });
-  if (groups[0].attrs.visible === false) annotator.transformer.nodes([]);
+  if (groups[0].attrs.visible) {
+    groups[0].setAttrs({ visible: false });
+    annotator.transformer.nodes([]);
+  } else {
+    groups[0].setAttrs({ visible: true });
+  }
 }
 
-function checkAnnotationVisibleById(id: string): boolean {
+function markboxVisible(id: string): boolean {
   const groups = annotator.layer.find(
     (node: Group) => node.getType() === "Group" && node.attrs.name === id
   );
@@ -529,17 +554,17 @@ function checkAnnotationVisibleById(id: string): boolean {
   return groups[0].attrs.visible;
 }
 
-function setAnnotationDraggableById(id: string, action: boolean) {
+function toggleMarkboxDraggable(id: string) {
   const rects = annotator.layer.find(
     (node: Node) => node.getClassName() === "Rect" && node.attrs.id === id
   );
   if (rects.length === 0) return;
-  action
-    ? rects[0].setAttrs({ draggable: true })
-    : rects[0].setAttrs({ draggable: false });
+  rects[0].attrs.draggable
+    ? rects[0].setAttrs({ draggable: false })
+    : rects[0].setAttrs({ draggable: true });
 }
 
-function checkAnnotationDraggableById(id: string): boolean {
+function markboxDraggable(id: string): boolean {
   const rects = annotator.layer.find(
     (node: Node) => node.getClassName() === "Rect" && node.attrs.id === id
   );
@@ -547,12 +572,13 @@ function checkAnnotationDraggableById(id: string): boolean {
   return rects[0].attrs.draggable;
 }
 
-function changeAnnotationLabel(selectedItem: string) {
-  if (!selectedItem) return;
+function changeAnnotationLabel(value: any) {
+  if (typeof value !== "string") return;
+
   const markbox = getMarkboxById(annotator.innerToolBox.getMarkboxId());
   if (!markbox) return;
 
-  const labelName = props.labels.find((item) => item.name === selectedItem);
+  const labelName = props.labels.find((item) => item.name === value);
   if (!labelName) return;
 
   markbox.labelName = labelName.name;
