@@ -182,8 +182,8 @@ const props = defineProps<{
 }>();
 
 const emits = defineEmits<{
-  (e: "saveMarkbox"): void;
-  (e: "changeFile"): void;
+  (e: "saveMarkbox", name: string, markboxes: Markbox[]): void;
+  (e: "changeFile", name: string, action: string): void;
 }>();
 
 const loading = ref(false);
@@ -214,6 +214,7 @@ async function init(): Promise<void> {
   if (!annotatorBox.value) return;
   await initAnnotator(annotatorBox.value, url, fileMarkboxes);
   markboxes.splice(0);
+
   if (fileMarkboxes.length === 0) return;
   fileMarkboxes.forEach((item) => markboxes.push(item));
 }
@@ -243,12 +244,7 @@ function getMarkboxById(id: string): Markbox | undefined {
 }
 
 function adjustMarkbox(node: Node, markbox: Markbox) {
-  const {
-    x: nodeX,
-    y: nodeY,
-    width: shapeWidth,
-    height: shapeHeight,
-  } = node.attrs;
+  const { x: nodeX, y: nodeY, width: shapeWidth, height: shapeHeight } = node.attrs;
   if (shapeWidth < 0) {
     const newX = nodeX + shapeWidth;
     const newWidth = Math.abs(shapeWidth);
@@ -325,6 +321,7 @@ function stopEditMarkboxVolume(event: KonvaPointerEvent): void {
     annotator.innerToolBox.updateMarkbox(markbox);
 
   annotator.innerToolBox.show(event.evt);
+  emits("saveMarkbox", props.file.name, markboxes);
 }
 
 function leaveAnnotateRange(): void {
@@ -337,14 +334,11 @@ function leaveAnnotateRange(): void {
 
   const mousePos = annotator.stage.getPointerPosition() as Vector2d;
   const stageConfig = annotator.stageConfig;
-  if (mousePos.x >= stageConfig.width)
-    markbox.width = stageConfig.width - markbox.x;
-  if (mousePos.y >= stageConfig.height)
-    markbox.height = stageConfig.height - markbox.y;
+  if (mousePos.x >= stageConfig.width) markbox.width = stageConfig.width - markbox.x;
+  if (mousePos.y >= stageConfig.height) markbox.height = stageConfig.height - markbox.y;
 
   const markboxNode = annotator.stage.findOne(
-    (node: Node) =>
-      node.attrs.id === markbox.id && node.getClassName() === "Rect"
+    (node: Node) => node.attrs.id === markbox.id && node.getClassName() === "Rect"
   );
   adjustMarkbox(markboxNode, markbox);
 }
@@ -432,9 +426,9 @@ function wheelResizeLayer(event: KonvaPointerEvent) {
   // mouse wheel event
   event.evt.preventDefault();
 
-  const altKey = (event.evt as MouseEvent as WheelEvent).altKey;
+  const altKey = ((event.evt as MouseEvent) as WheelEvent).altKey;
   if (!altKey) return;
-  const direction = (event.evt as MouseEvent as WheelEvent).deltaY;
+  const direction = ((event.evt as MouseEvent) as WheelEvent).deltaY;
 
   // layer resize
   const oldScale = annotator.layer.scaleX();
@@ -483,10 +477,10 @@ function handleKeyDownEvent(event: KeyboardEvent) {
 
   switch (event.key.toUpperCase()) {
     case "A":
-      // handleSwitchImage("pre");
+      changeFile("prev");
       break;
     case "D":
-      // handleSwitchImage("next");
+      changeFile("next");
       break;
     case "W":
       annotator.changeAnnotateMode("add");
@@ -582,5 +576,9 @@ function changeAnnotationLabel(value: any) {
   if (!labelName) return;
 
   markbox.labelName = labelName.name;
+}
+
+function changeFile(action: string): void {
+  emits("changeFile", props.file.name, action);
 }
 </script>
