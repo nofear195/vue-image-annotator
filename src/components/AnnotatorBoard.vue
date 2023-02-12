@@ -11,7 +11,10 @@
       element-loading-text="Loading image..."
     >
       <div class="flex absolute z-10" :style="annotator.innerToolBox.boxStyle">
-        <select :value="currentLabel.name" @change="changeAnnotationLabel">
+        <select
+          :model-value="currentLabel.name"
+          @change="changeAnnotationLabel"
+        >
           <option
             v-for="item in labels"
             :key="item.name"
@@ -184,6 +187,7 @@ const props = defineProps<{
 const emits = defineEmits<{
   (e: "saveMarkbox", name: string, markboxes: Markbox[]): void;
   (e: "changeFile", name: string, action: string): void;
+  (e: "changeLabel", name: string): void;
 }>();
 
 const loading = ref(false);
@@ -244,7 +248,12 @@ function getMarkboxById(id: string): Markbox | undefined {
 }
 
 function adjustMarkbox(node: Node, markbox: Markbox) {
-  const { x: nodeX, y: nodeY, width: shapeWidth, height: shapeHeight } = node.attrs;
+  const {
+    x: nodeX,
+    y: nodeY,
+    width: shapeWidth,
+    height: shapeHeight,
+  } = node.attrs;
   if (shapeWidth < 0) {
     const newX = nodeX + shapeWidth;
     const newWidth = Math.abs(shapeWidth);
@@ -260,6 +269,7 @@ function adjustMarkbox(node: Node, markbox: Markbox) {
     markbox.y = newY;
     markbox.height = newHeight;
   }
+  emits("saveMarkbox", props.file.name, markboxes);
 }
 
 function removeMarkbox(id: string) {
@@ -275,6 +285,7 @@ function removeMarkbox(id: string) {
   markboxes.splice(targetIndex, 1);
   if (markboxes.length === 0) return;
   annotator.innerToolBox.updateMarkbox(markboxes.at(-1)!);
+  emits("saveMarkbox", props.file.name, markboxes);
 }
 
 ///////// creat markbox
@@ -321,7 +332,6 @@ function stopEditMarkboxVolume(event: KonvaPointerEvent): void {
     annotator.innerToolBox.updateMarkbox(markbox);
 
   annotator.innerToolBox.show(event.evt);
-  emits("saveMarkbox", props.file.name, markboxes);
 }
 
 function leaveAnnotateRange(): void {
@@ -334,13 +344,17 @@ function leaveAnnotateRange(): void {
 
   const mousePos = annotator.stage.getPointerPosition() as Vector2d;
   const stageConfig = annotator.stageConfig;
-  if (mousePos.x >= stageConfig.width) markbox.width = stageConfig.width - markbox.x;
-  if (mousePos.y >= stageConfig.height) markbox.height = stageConfig.height - markbox.y;
+  if (mousePos.x >= stageConfig.width)
+    markbox.width = stageConfig.width - markbox.x;
+  if (mousePos.y >= stageConfig.height)
+    markbox.height = stageConfig.height - markbox.y;
 
   const markboxNode = annotator.stage.findOne(
-    (node: Node) => node.attrs.id === markbox.id && node.getClassName() === "Rect"
+    (node: Node) =>
+      node.attrs.id === markbox.id && node.getClassName() === "Rect"
   );
   adjustMarkbox(markboxNode, markbox);
+  annotator.innerToolBox.hidden();
 }
 
 ////// drag markbox
@@ -376,6 +390,7 @@ function stopDragMarkbox(event: KonvaPointerEvent): void {
     markbox.x = x;
   }
   annotator.innerToolBox.show(event.evt);
+  emits("saveMarkbox", props.file.name, markboxes);
 }
 
 function updateTransformerContent(id: string, evt: MouseEvent): void {
@@ -419,6 +434,7 @@ function stopResizeMarkbox(event: KonvaPointerEvent) {
 
   target.setAttrs({ x: eventX, y: eventY, scaleX: 1, scaleY: 1 });
   annotator.innerToolBox.show(event.evt);
+  emits("saveMarkbox", props.file.name, markboxes);
 }
 
 // resize layer
@@ -426,9 +442,9 @@ function wheelResizeLayer(event: KonvaPointerEvent) {
   // mouse wheel event
   event.evt.preventDefault();
 
-  const altKey = ((event.evt as MouseEvent) as WheelEvent).altKey;
+  const altKey = (event.evt as MouseEvent as WheelEvent).altKey;
   if (!altKey) return;
-  const direction = ((event.evt as MouseEvent) as WheelEvent).deltaY;
+  const direction = (event.evt as MouseEvent as WheelEvent).deltaY;
 
   // layer resize
   const oldScale = annotator.layer.scaleX();
@@ -469,6 +485,7 @@ function enterAnnotatorBox() {
 function leaveAnnotatorBox() {
   document.body.style.cursor = "auto";
   annotator.innerToolBox.hidden();
+  emits("saveMarkbox", props.file.name, markboxes);
 }
 
 function handleKeyDownEvent(event: KeyboardEvent) {
@@ -477,10 +494,10 @@ function handleKeyDownEvent(event: KeyboardEvent) {
 
   switch (event.key.toUpperCase()) {
     case "A":
-      changeFile("prev");
+      emits("changeFile", props.file.name, "prev");
       break;
     case "D":
-      changeFile("next");
+      emits("changeFile", props.file.name, "next");
       break;
     case "W":
       annotator.changeAnnotateMode("add");
@@ -506,6 +523,7 @@ function handleKeyDownEvent(event: KeyboardEvent) {
       if (!labelHotKey.includes(event.key)) return;
       hotkeyNum = Number(event.key) != 0 ? Number(event.key) - 1 : 9;
       if (props.labels[hotkeyNum] === undefined) return;
+      emits("changeLabel", props.labels[hotkeyNum].name);
   }
 }
 
@@ -566,8 +584,9 @@ function markboxDraggable(id: string): boolean {
   return rects[0].attrs.draggable;
 }
 
-function changeAnnotationLabel(value: any) {
-  if (typeof value !== "string") return;
+function changeAnnotationLabel(event: Event) {
+  const target = event.target as HTMLSelectElement;
+  const value = target.value;
 
   const markbox = getMarkboxById(annotator.innerToolBox.getMarkboxId());
   if (!markbox) return;
@@ -576,9 +595,5 @@ function changeAnnotationLabel(value: any) {
   if (!labelName) return;
 
   markbox.labelName = labelName.name;
-}
-
-function changeFile(action: string): void {
-  emits("changeFile", props.file.name, action);
 }
 </script>
