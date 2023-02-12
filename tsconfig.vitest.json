@@ -4,6 +4,6 @@
   "compilerOptions": {
     "composite": true,
     "lib": [],
-    "types": ["node", "jsdom","element-plus/global"]
+    "types": ["node", "jsdom","element-plus/global","vite/client"]
   }
 }
