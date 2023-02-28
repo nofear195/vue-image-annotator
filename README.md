@@ -15,7 +15,7 @@ npm run serve
 
 ## Demo
 
-Here's a live demo of the component in action: [Link to Demo](http://localhost:4173/vue-image-annotator/)
+Here's a live demo of the component in action: [Link to Demo](https://nofear195.github.io/vue-image-annotator/)
 
 
 ## Screenshots
