@@ -19,4 +19,5 @@ export default defineConfig({
       usePolling: true,
     },
   },
+  base:'/vue-image-annotator/',
 })
