@@ -103,7 +103,7 @@ onMounted(() => {
   );
 });
 
-function changeLoadInfile(name: string, action: string):void {
+function changeLoadInfile(name: string, action: string): void {
   const index = toolData.files.findIndex((item) => item.name === name);
   if (index === -1) return;
   if (index === 0 && action === "prev") return;
@@ -120,14 +120,14 @@ function saveMarkbox(name: string, markboxes: Markbox[]) {
   target.markboxes = JSON.parse(JSON.stringify(markboxes));
 }
 
-function changeCurrentLabel(name: string):void {
+function changeCurrentLabel(name: string): void {
   const index = labels.findIndex((label) => label.name === name);
   if (index === -1) return;
   labelIndex.value = index;
 }
 
-function pickFile(name:string):void{
-  const index = toolData.files.findIndex((item)=> item.name === name)
+function pickFile(name: string): void {
+  const index = toolData.files.findIndex((item) => item.name === name);
   if (index === -1) return;
   fileIndex.value = index;
 }

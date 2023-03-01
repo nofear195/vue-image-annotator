@@ -230,7 +230,7 @@ async function initAnnotator(
 ): Promise<void> {
   loading.value = true;
 
-  annotator.initImageSetting(container, url);
+  await annotator.initImageSetting(container, url);
   annotator.initCanvas(stage.value);
   if (markboxes.length >= 1) annotator.innerToolBox.updateMarkbox(markboxes[0]);
 
