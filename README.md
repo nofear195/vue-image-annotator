@@ -4,13 +4,13 @@ This project is a customizable Vue.js component for annotating images in a web a
 
 ## Getting Started
 
-To get started with this project, simply clone this repository and run `npm install` to install the dependencies. Then, run `npm run serve` to start the development server.
+To get started with this project, simply clone this repository and run `npm install` to install the dependencies. Then, run `npm run dev` to start the development server.
 
 ```
 git clone https://github.com/nofear195/vue-image-annotator.git
 cd vue-image-annotator
 npm install
-npm run serve
+npm run dev
 ```
 
 ## Demo
