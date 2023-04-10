@@ -39,12 +39,10 @@
           @mouseleave="leaveAnnotateRange"
           @wheel="wheelResizeLayer"
           @dragmove="dragLayer"
+          @mousemove="editMarkboxVolume"
+          @mouseup="stopEditMarkboxVolume"
         >
-          <v-image
-            :config="annotator.imageConfig"
-            @mousedown="createMarkbox"
-            @mousemove="editMarkboxVolume"
-          />
+          <v-image :config="annotator.imageConfig" @mousedown="createMarkbox" />
           <v-group
             v-for="item in markboxes"
             :key="item.id"
@@ -60,7 +58,6 @@
                 stroke: `${getLabelColor(item.labelName, labels)}`,
                 draggable: true,
               }"
-              @mouseup="stopEditMarkboxVolume"
               @dragmove="startDragMarkbox"
               @dragend="stopDragMarkbox"
               @transformend="stopResizeMarkbox"
