@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center w-screen h-screen flex-col">
-    <div class="w-[95vw] h-[22vh] border p-3 mt-3">
+    <div class="w-[95vw] h-[24vh] border p-1 mt-3">
       <el-scrollbar>
         <div class="flex">
           <div
@@ -50,6 +50,7 @@ import {
   Markbox,
   ToolData,
 } from "@/services/annotator.service";
+import getImageUrl from "@/services/image.service";
 
 const toolData: ToolData = reactive(new ToolData());
 const fileIndex: Ref<number> = ref(0);
@@ -89,18 +90,16 @@ onMounted(() => {
       color: getFixedColorHEXCode(i),
     });
   }
-  toolData.files.push(
-    {
-      name: "file01",
+
+  for (let i = 1; i <= 5; i++) {
+    const fileName: string = `dog0${i}.jpg`;
+    const file: FileInfo = {
+      name: fileName,
       markboxes: [],
-      url: "https://images.unsplash.com/photo-1495638671147-2cb03fe8e33e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2070&q=80",
-    },
-    {
-      name: "file02",
-      markboxes: [],
-      url: "https://images.unsplash.com/photo-1623623294213-ec23975a7038?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1674&q=80",
-    }
-  );
+      url: getImageUrl(fileName),
+    };
+    toolData.files.push(file)
+  }
 });
 
 function changeLoadInfile(name: string, action: string): void {
